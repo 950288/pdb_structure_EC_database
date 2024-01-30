@@ -1,49 +1,47 @@
 import requests
 import Bio.PDB
+from Bio.PDB import PDBIO
 
 pdb_under_600AA = []
 
 # Read the pdb_id.tsv file into a DataFrame
-# remove olignoproteins, and those longer than 600 amino acids
+# Remove olignoproteins, and those longer than 600 amino acids
 with open('pdb_id.tsv', 'r' ) as f:
     df = f.readlines()
     for pdb in df:
-        # Get the length of the protein
         pdb = pdb.replace('\n','')
-        print(pdb.replace('\n',''))
-        url = 'https://files.rcsb.org/download/' + pdb + '.pdb'
-        print(url)
-        response = requests.get(url)
-        if response.status_code == 200:
 
-            lines = response.text.split('\n')
+        pdbl = Bio.PDB.PDBList()
+        pdbl.retrieve_pdb_file(pdb, pdir = "./acahe", )
 
-            parser = Bio.PDB.PDBParser()
-            # structure = parser.get_structure(response.text, pdb + '.pdb')
-            parser.structure_builder.init_structure(lines)
-            parser._parse(lines)
-            structure = parser.structure_builder.get_structure()
+        parser = Bio.PDB.MMCIFParser()
+        structure = parser.get_structure(pdb,"./acahe/" + pdb + '.cif')
+          
+        model  = next(structure.get_models())
 
-            print(structure)
+        if len(list(model.get_chains())) > 1:
+            print('olignoprotein removed ' + "!" * 10)
+            continue
+            
+        chain_A = next(model.get_chains())   
+        length = len(list(chain_A.get_residues()))
+        if length < 600:
+            # 创建一个 PDBIO 对象，用于保存 pdb 文件
+            io = PDBIO()
+            # 设置是否保留原子序号，这里设为 False，让其自动生成
+            io.set_structure(structure)
+            # 将structure保存为一条base64编码的字符串在pdb编号后面
+            print(pdb + '\t' + io._get_atom_line())
+            # pdb = pdb + '\t' + io._get_atom_line() + '\n'
+            # pdb_under_600AA.append(pdb.replace('\n',''))
+        else:
+            print(length + 'longer than 600 amino acids removed ' + "!" * 10)
 
+# Save the pdb_id.tsv file into a DataFrame
+with open('pdb_id_under_600AA.tsv', 'w' ) as f:
+    for pdb in pdb_under_600AA:
+        f.write(pdb + '\n')
 
-            model  = structure.get_models()
-
-            print(model.get_chains())
-            if len(model.get_chains()) > 1:
-                print('olignoprotein removed !')
-                continue
-                
-        #     print(structure.get_models()[0].get_chains())
-        #     # print(int(protein[len(protein)-1][23:31]))
-        #     # if int(protein[len(protein)-1][23:31]) < 600:
-        #     #     pdb_under_600AA.append(pdb.replace('\n',''))
-        #     # else:
-        #     #     print(str(int(protein[len(protein)-1][23:31])) + 'longer than 600 amino acids removed !')
-
-        # else :
-        #     print('Error: ', response.status_code)
-        break
 
     
 
